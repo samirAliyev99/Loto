@@ -1,5 +1,3 @@
-import crypto from 'node:crypto';
-
 // SİMA sign-in. Every provider has the same shape:
 //   createRequest(purpose)  -> { requestId, deeplink, demoUrl?, expiresAt }
 //   getResult(requestId)    -> { status: 'pending' | 'signed' | 'rejected' | 'expired', identity? }
@@ -15,29 +13,24 @@ export function normalizeFin(fin) {
 
 // Simulates the SİMA phone app so the whole flow can be tried without a contract.
 // The "phone" is public/sima-demo.html; it calls sign() through /api/sima/mock/*.
+// Requests live in a plain object so the browser-only build can keep them in localStorage.
 export class MockSimaProvider {
-  constructor({ secret = crypto.randomBytes(32), ttlMs = 5 * 60_000, now = Date.now } = {}) {
-    this.secret = secret;
+  constructor({ requests = {}, ttlMs = 5 * 60_000, now = Date.now } = {}) {
+    this.requests = requests;
     this.ttlMs = ttlMs;
     this.now = now;
-    this.requests = new Map();
   }
 
   createRequest(purpose) {
-    const id = crypto.randomUUID();
+    const id = globalThis.crypto.randomUUID();
     const expiresAt = this.now() + this.ttlMs;
-    this.requests.set(id, {
-      id,
-      purpose,
-      challenge: crypto.randomBytes(16).toString('hex'),
-      status: 'pending',
-      expiresAt,
-    });
+    const challenge = Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+    this.requests[id] = { id, purpose, challenge, status: 'pending', expiresAt };
     return { requestId: id, deeplink: `sima://sign?request=${id}`, demoUrl: `sima-demo.html?req=${id}`, expiresAt };
   }
 
   #get(id) {
-    const req = this.requests.get(id);
+    const req = Object.hasOwn(this.requests, id) ? this.requests[id] : null;
     if (req && req.status === 'pending' && this.now() > req.expiresAt) req.status = 'expired';
     return req;
   }
@@ -46,10 +39,6 @@ export class MockSimaProvider {
     const req = this.#get(id);
     if (!req) return null;
     return { purpose: req.purpose, challenge: req.challenge, status: req.status, expiresAt: req.expiresAt };
-  }
-
-  #signature(req, identity) {
-    return crypto.createHmac('sha256', this.secret).update(`${req.challenge}|${identity.fin}|${identity.fullName}`).digest('hex');
   }
 
   sign(id, { fin, fullName, approve = true }) {
@@ -64,7 +53,6 @@ export class MockSimaProvider {
     if (!identity.fin) throw new Error('FİN 7 simvol olmalıdır (rəqəm və latın hərfi).');
     if (identity.fullName.length < 3) throw new Error('Ad və soyad daxil edin.');
     req.identity = identity;
-    req.signature = this.#signature(req, identity);
     req.status = 'signed';
   }
 
@@ -73,9 +61,15 @@ export class MockSimaProvider {
     if (!req) return { status: 'expired' };
     if (req.status !== 'signed') return { status: req.status };
     // A real provider verifies the signature and certificate chain here.
-    const valid = crypto.timingSafeEqual(Buffer.from(req.signature, 'hex'), Buffer.from(this.#signature(req, req.identity), 'hex'));
-    this.requests.delete(id);
-    return valid ? { status: 'signed', identity: req.identity } : { status: 'rejected' };
+    delete this.requests[id];
+    return { status: 'signed', identity: req.identity };
+  }
+
+  // Drops finished requests so the store doesn't grow forever.
+  prune() {
+    for (const [id, req] of Object.entries(this.requests)) {
+      if (this.now() > req.expiresAt + this.ttlMs) delete this.requests[id];
+    }
   }
 }
 
@@ -102,9 +96,11 @@ export class SimaProvider {
     //    chain, then read the FIN and full name from the certificate.
     throw new Error('SİMA integration is not configured yet.');
   }
+
+  prune() {}
 }
 
-export function createSimaProvider(env = process.env) {
+export function createSimaProvider(env) {
   if (env.DEMO === '1') return new MockSimaProvider();
   return new SimaProvider({ apiUrl: env.SIMA_API_URL, clientId: env.SIMA_CLIENT_ID, clientSecret: env.SIMA_CLIENT_SECRET });
 }

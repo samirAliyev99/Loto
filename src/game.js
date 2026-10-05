@@ -1,9 +1,17 @@
-import crypto from 'node:crypto';
-
 // Pure game rules. Every function takes the db object ({ users, rooms, sessions })
 // and an explicit `now` so the whole lifecycle can be tested without a clock.
 
 const DAY = 86_400_000;
+
+// Web Crypto works in both Node (20+) and the browser, so this file runs in either.
+export function randomInt(max) {
+  const limit = Math.floor(0x1_0000_0000 / max) * max;
+  const buf = new Uint32Array(1);
+  do globalThis.crypto.getRandomValues(buf); while (buf[0] >= limit);
+  return buf[0] % max;
+}
+
+export const randomId = () => globalThis.crypto.randomUUID();
 
 // Rating unlocks bigger rooms. maxAmount is the monthly contribution per person,
 // maxRooms is how many open/active rooms a member may be in at once.
@@ -92,7 +100,7 @@ export function eligibility(db, user, room) {
 function randomCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
-  for (let i = 0; i < 6; i++) code += alphabet[crypto.randomInt(alphabet.length)];
+  for (let i = 0; i < 6; i++) code += alphabet[randomInt(alphabet.length)];
   return code;
 }
 
@@ -113,7 +121,7 @@ export function createRoom(db, user, input, now) {
   if (!LIMITS.periodDays.includes(periodDays)) throw new GameError('Dövr həftəlik (7) və ya aylıq (30) olmalıdır.');
 
   const room = {
-    id: crypto.randomUUID(),
+    id: randomId(),
     code: randomCode(),
     name,
     creatorId: user.id,
@@ -143,11 +151,11 @@ export function findRoomByCode(db, code) {
   return Object.values(db.rooms).find((r) => r.code === c) || null;
 }
 
-export function joinRoom(db, user, room, now, randomInt = crypto.randomInt) {
+export function joinRoom(db, user, room, now, rand = randomInt) {
   const check = eligibility(db, user, room);
   if (!check.ok) throw new GameError(check.reason, 403);
   room.members.push(user.id);
-  if (room.members.length === room.memberCount) startRoom(db, room, now, randomInt);
+  if (room.members.length === room.memberCount) startRoom(db, room, now, rand);
 }
 
 export function leaveRoom(db, user, room) {
@@ -158,18 +166,18 @@ export function leaveRoom(db, user, room) {
   else if (room.creatorId === user.id) room.creatorId = room.members[0];
 }
 
-function shuffle(list, randomInt) {
+function shuffle(list, rand) {
   const a = [...list];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = randomInt(i + 1);
+    const j = rand(i + 1);
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
 }
 
-function startRoom(db, room, now, randomInt) {
+function startRoom(db, room, now, rand) {
   // Shuffle first so equal ratings are still ordered by the draw.
-  let order = shuffle(room.members, randomInt);
+  let order = shuffle(room.members, rand);
   if (room.order === 'rating') {
     order = order.sort((a, b) => db.users[b].rating - db.users[a].rating);
   }

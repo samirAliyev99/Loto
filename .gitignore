@@ -1,2 +1,4 @@
 data/db.json
 data/db.json.tmp
+dist/
+node_modules/

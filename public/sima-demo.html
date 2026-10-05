@@ -12,21 +12,20 @@
     <div class="phone" id="phone"><p class="muted">Yüklənir…</p></div>
   </main>
   <script type="module">
+    import { api } from './api.js';
     const phone = document.getElementById('phone');
     const id = new URLSearchParams(location.search).get('req');
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-    async function send(body) {
-      const res = await fetch(`api/sima/mock/${encodeURIComponent(id)}/sign`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-    }
+    const send = (body) => api(`sima/mock/${encodeURIComponent(id)}/sign`, { method: 'POST', body });
 
-    const res = await fetch(`api/sima/mock/${encodeURIComponent(id)}`);
-    const req = await res.json();
-    if (!res.ok || req.status !== 'pending') {
+    let req;
+    try {
+      req = await api(`sima/mock/${encodeURIComponent(id)}`);
+    } catch (err) {
+      req = { error: err.message };
+    }
+    if (req.error || req.status !== 'pending') {
       phone.innerHTML = `<h2>SİMA</h2><p>${esc(req.error || 'Sorğu artıq aktiv deyil.')}</p>`;
     } else {
       phone.innerHTML = `

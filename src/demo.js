@@ -1,5 +1,4 @@
-import crypto from 'node:crypto';
-import { newUser, joinRoom, markSent, confirmPayment, requiredTier } from './game.js';
+import { newUser, joinRoom, markSent, confirmPayment, requiredTier, randomInt, randomId } from './game.js';
 
 // Demo-only helpers so one person can play a whole room alone in the browser.
 
@@ -8,10 +7,10 @@ const BOT_NAMES = ['Aysel Məmmədova', 'Rəşad Əliyev', 'Günay Həsənova', 
 
 function botFor(db, rating, now) {
   const bot = newUser({
-    id: crypto.randomUUID(),
+    id: randomId(),
     finHash: null,
     finMasked: 'DEMO***',
-    fullName: BOT_NAMES[crypto.randomInt(BOT_NAMES.length)],
+    fullName: BOT_NAMES[randomInt(BOT_NAMES.length)],
   }, now);
   bot.rating = rating;
   bot.isBot = true;

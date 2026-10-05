@@ -1,3 +1,5 @@
+import { api as request, isStatic, resetLocalData } from './api.js';
+
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
 let config = null;
@@ -36,19 +38,13 @@ function toast(message, error = false) {
   toast.timer = setTimeout(() => { el.hidden = true; }, 3500);
 }
 
-async function api(path, { method = 'GET', body } = {}) {
-  const res = await fetch(`api/${path}`, {
-    method,
-    headers: body !== undefined || method !== 'GET' ? { 'Content-Type': 'application/json' } : {},
-    body: body !== undefined ? JSON.stringify(body) : method !== 'GET' ? '{}' : undefined,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (res.status === 401) {
-    location.hash = '#/login';
-    throw new Error(data.error || 'Daxil olun.');
+async function api(path, options) {
+  try {
+    return await request(path, options);
+  } catch (err) {
+    if (err.status === 401) location.hash = '#/login';
+    throw err;
   }
-  if (!res.ok) throw new Error(data.error || `Xəta ${res.status}`);
-  return data;
 }
 
 // Wraps a click handler: shows errors as a toast and re-renders on success.
@@ -399,6 +395,17 @@ document.getElementById('logout').addEventListener('click', async () => {
 });
 
 config = await api('config');
-document.getElementById('demo-banner').hidden = !config.demo;
+const banner = document.getElementById('demo-banner');
+banner.hidden = !config.demo;
+if (isStatic) {
+  banner.innerHTML = `DEMO: SİMA simulyasiya olunur, botlarla oynamaq olar. Hər şey yalnız bu brauzerdə saxlanılır.
+    <button class="link" id="reset">Sıfırla</button>`;
+  document.getElementById('reset').addEventListener('click', async () => {
+    if (!confirm('Bütün demo məlumatları silinsin?')) return;
+    await resetLocalData();
+    location.hash = '#/login';
+    location.reload();
+  });
+}
 window.addEventListener('hashchange', renderRoute);
 renderRoute();

@@ -2,6 +2,8 @@
 
 Azərbaycanda ailələr və yaxınlar arasında oynanan "lotereya"nın onlayn versiyası.
 
+**Canlı demo: https://samiraliyev99.github.io/Loto/**
+
 **Məntiq.** 5 nəfər bir araya gəlir. Hər ay biri pulu götürür, qalan 4 nəfər ona eyni məbləği verir. Oyun 5 ay davam edir. Sonda heç kim pul itirmir: hər kəs bir ay böyük məbləği alır, qalan 4 ayda isə payını verir.
 
 | | 1-ci ay | 2-ci ay | 3-cü ay | 4-cü ay | 5-ci ay | Cəmi |
@@ -44,7 +46,7 @@ Reytinqi mənfi olan istifadəçi yeni otağa qoşula bilmir.
 
 ## İşə salmaq
 
-Yalnız Node.js 18+ lazımdır, heç bir asılılıq yoxdur.
+Yalnız Node.js 20+ lazımdır, heç bir asılılıq yoxdur.
 
 ```bash
 npm run demo     # http://localhost:3100, SİMA simulyasiya olunur, botlar var
@@ -60,6 +62,20 @@ npm test
 | `FIN_SECRET` | demoda sabit | FİN heşi üçün gizli açar (production-da **mütləq**) |
 | `DB_FILE` | `data/db.json` | Məlumat faylı |
 | `SIMA_API_URL`, `SIMA_CLIENT_ID`, `SIMA_CLIENT_SECRET` | — | Real SİMA inteqrasiyası |
+
+## GitHub Pages-dəki demo
+
+GitHub Pages yalnız statik faylları paylayır, Node serveri işlədə bilmir. Ona görə `.github/workflows/pages.yml` hər push-da belə edir:
+
+1. testləri işlədir;
+2. `npm run build` ilə saytı və ortaq modulları (`src/api.js`, `game.js`, `sima.js`, `demo.js`, `local-api.js`) `dist/` qovluğuna yığır;
+3. `dist/` qovluğunu GitHub Pages-ə yükləyir.
+
+Pages versiyasında eyni API brauzerin içində işləyir (`src/local-api.js`). Məlumatlar yalnız həmin brauzerin `localStorage`-ında saxlanılır. Hər ziyarətçinin öz ayrıca demosu olur, başqa adamlarla birlikdə oynamaq olmur. Banerdəki "Sıfırla" düyməsi bütün demo məlumatlarını silir. Bir brauzerdə bir neçə istifadəçini sınamaq üçün çıxış edib başqa FİN ilə daxil olmaq kifayətdir.
+
+**Bir dəfəlik quraşdırma:** repo-da **Settings → Pages** bölməsinə keçin və **Build and deployment → Source** üçün **GitHub Actions** seçin.
+
+Real istifadəçilərin birlikdə oynaması üçün server lazımdır: `npm start` hər hansı Node hostinqində (Render, Railway, Fly.io, VPS) işləyə bilər.
 
 ## SİMA inteqrasiyası
 
@@ -104,11 +120,14 @@ Bu kod işlək prototipdir (MVP). İnsanların real pulu ilə işə salmazdan ə
 ## Struktur
 
 ```
-server.js        HTTP server, API, sessiyalar, gecikmə yoxlaması (dəqiqədə bir)
+server.js        HTTP server, cookie sessiyaları, gecikmə yoxlaması (dəqiqədə bir)
+src/api.js       API marşrutları (serverdə də, brauzerdə də eynidir)
+src/local-api.js API-ni brauzerdə localStorage üzərində işlədir (Pages demosu)
 src/game.js      Oyun qaydaları: otaq, növbə, ödəniş, reytinq, səviyyə
 src/sima.js      SİMA provayderləri (demo və real şablon)
 src/store.js     JSON fayl bazası
 src/demo.js      Demo botları
-public/          Veb interfeys (Azərbaycan dilində)
+public/          Veb interfeys (Azərbaycan dilində); public/api.js server və ya lokal API seçir
+scripts/build.js GitHub Pages üçün statik build (dist/)
 test/            node:test testləri
 ```
